@@ -18,6 +18,8 @@
 namespace Amqp
 {
     using System;
+    using System.Threading;
+    using System.Threading.Tasks;
     using Amqp.Framing;
     using Amqp.Handler;
     using Amqp.Types;
@@ -104,6 +106,19 @@ namespace Amqp
         public Session(Connection connection)
             : this(connection, Default(connection), null)
         {
+        }
+
+        /// <summary>
+        /// Creates a session asynchronously, completing when onBegin callback has been invoked, signalling a begin has also been received from peer.
+        /// </summary>
+        /// <param name="connection">>The connection in which the session will be created.</param>
+        /// <returns></returns>
+        public static async Task<Session> CreateSessionAsync(Connection connection)
+        {
+            AutoResetEvent onBeginEvent = new AutoResetEvent(false);
+            Session session = new Session(connection, Default(connection), (session, begin) => onBeginEvent.Set());
+            await Task.Run(() => onBeginEvent.WaitOne());
+            return session;
         }
 
         /// <summary>

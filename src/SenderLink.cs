@@ -19,6 +19,7 @@ namespace Amqp
 {
     using System;
     using System.Threading;
+    using System.Threading.Tasks;
     using Amqp.Framing;
     using Amqp.Handler;
 
@@ -35,6 +36,15 @@ namespace Amqp
         SenderSettleMode settleMode;
         LinkedList outgoingList;
         bool writing;
+
+
+        public static async Task<SenderLink> CreateSenderLinkAsync(Session session, string name, string address)
+        {
+            AutoResetEvent onAttachEvent = new AutoResetEvent(false);
+            var senderLink = new SenderLink(session, name, new Target() { Address = address }, (ILink link, Attach attach) => { onAttachEvent.Set(); });
+            await Task.Run(() => onAttachEvent.WaitOne());
+            return senderLink;
+        }
 
         /// <summary>
         /// Initializes a sender link.

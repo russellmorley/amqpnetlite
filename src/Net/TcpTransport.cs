@@ -22,6 +22,8 @@ namespace Amqp
     using System.Net;
     using System.Net.Security;
     using System.Net.Sockets;
+    using System.Security.Authentication;
+    using System.Security.Cryptography;
     using System.Threading;
     using System.Threading.Tasks;
     using Amqp.Handler;
@@ -138,7 +140,21 @@ namespace Amqp
                 {
                     if (ssl == null)
                     {
-                        await sslStream.AuthenticateAsClientAsync(address.Host).ConfigureAwait(false);
+                        try
+                        {
+                            await sslStream.AuthenticateAsClientAsync(address.Host).ConfigureAwait(false);
+                            Trace.WriteLine(TraceLevel.Frame, $"RESULTS OF AUTHENTICATEASCLIENT: IsEncrypted: {sslStream.IsEncrypted}; IsSigned: {sslStream.IsSigned};"); // Not supported in Mono: IsMutuallyAuthenticated: {sslStream.IsMutuallyAuthenticated}");
+                        }
+                        catch (AuthenticationException aex)
+                        {
+                            Trace.WriteLine(TraceLevel.Error, $"Exception From SSLStream.AuthenticateAsClient(): {aex}");
+                            throw aex;
+                        }
+                        catch (Exception ex)
+                        {
+                            Trace.WriteLine(TraceLevel.Error, $"Exception From SSLStream.AuthenticateAsClient(): {ex}");
+                            throw ex;
+                        }
                     }
                     else
                     {
@@ -369,8 +385,8 @@ namespace Amqp
 
             async Task<int> IAsyncTransport.ReceiveAsync(byte[] buffer, int offset, int count)
             {
-                return await this.sslStream.ReadAsync(buffer, offset, count).ConfigureAwait(false);
-            }
+                return await Task.Run(() => this.sslStream.ReadAsync(buffer, offset, count)).ConfigureAwait(false);
+            } // it looks like in wilderness labs .net runtime that this blocks for this reason https://github.com/dotnet/runtime/issues/15978#issuecomment-171964571
 
             void ITransport.Send(ByteBuffer buffer)
             {
